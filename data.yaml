@@ -2,12 +2,12 @@ train: ../train/images
 val: ../valid/images
 test: ../test/images
 
-nc: 1
-names: ['palm oil']
+nc: 2
+names: ['Black FFB', 'Red FFB']
 
 roboflow:
-  workspace: fyp-mxrwa
-  project: oil-palm-masak
-  version: 2
-  license: CC BY 4.0
-  url: https://universe.roboflow.com/fyp-mxrwa/oil-palm-masak/dataset/2
+  workspace: 1171102868
+  project: ffb-oil-palm-1
+  version: 17
+  license: Public Domain
+  url: https://universe.roboflow.com/1171102868/ffb-oil-palm-1/dataset/17

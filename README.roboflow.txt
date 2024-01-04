@@ -1,8 +1,8 @@
 
-oil palm masak  - v2 2023-12-30 2:04pm
+ffb oil palm 1 - v17 2021-09-24 3:44am
 ==============================
 
-This dataset was exported via roboflow.com on December 30, 2023 at 2:14 PM GMT
+This dataset was exported via roboflow.com on April 18, 2023 at 7:32 AM GMT
 
 Roboflow is an end-to-end computer vision platform that helps you
 * collaborate with your team on computer vision projects
@@ -17,13 +17,18 @@ visit https://github.com/roboflow/notebooks
 
 To find over 100k other datasets and pre-trained models, visit https://universe.roboflow.com
 
-The dataset includes 600 images.
-Oil-palm-masal are annotated in YOLOv8 format.
+The dataset includes 155 images.
+Oil-palm are annotated in YOLOv8 format.
 
 The following pre-processing was applied to each image:
 * Auto-orientation of pixel data (with EXIF-orientation stripping)
-* Resize to 640x640 (Stretch)
+* Resize to 416x416 (Stretch)
+* Auto-contrast via contrast stretching
 
-No image augmentation techniques were applied.
+The following augmentation was applied to create 1 versions of each source image:
+* 50% probability of horizontal flip
+* 50% probability of vertical flip
+* Random brigthness adjustment of between -30 and +30 percent
+* Random exposure adjustment of between -20 and +20 percent
 
 

@@ -1,6 +1,6 @@
-# oil palm masak  > 2023-12-30 2:04pm
-https://universe.roboflow.com/fyp-mxrwa/oil-palm-masak
+# ffb oil palm 1 > 2021-09-24 3:44am
+https://universe.roboflow.com/1171102868/ffb-oil-palm-1
 
 Provided by a Roboflow user
-License: CC BY 4.0
+License: Public Domain
 
