@@ -1,11 +1,19 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QDialog, QVBoxLayout, QMessageBox, QWidget, \
     QHBoxLayout, QFileDialog
-
+import subprocess
+import cv2
+import os
+from ultralytics import YOLO
+import cv2
+import tensorflow as tf
 
 class MyApp(QWidget):
     window_size_x = 300
     window_size_y = 300
+    video_path = r"C:\Users\USER\Downloads\Harvesting Palm Oil Using a Machine.mp4"
+    model = YOLO(r"C:\Users\USER\source\repos\YOLO\model\best_prev.pt")
+    cap = cv2.VideoCapture(video_path)
 
     def __init__(self):
         super().__init__()
@@ -18,7 +26,7 @@ class MyApp(QWidget):
         detection_btn = QPushButton('Detection', self)
         detection_btn.setToolTip('Click to show a message box')
         detection_btn.move(self.window_size_x // 3, self.window_size_y // 3)
-        detection_btn.clicked.connect(self.showMessageBox)
+        detection_btn.clicked.connect(self.capture_video)
 
         segmentation_btn = QPushButton('Segmentation', self)
         segmentation_btn.setToolTip('Click to open segmentation window')
@@ -32,6 +40,30 @@ class MyApp(QWidget):
         msg_box.setIcon(QMessageBox.Information)
         msg_box.setStandardButtons(QMessageBox.Ok)
         msg_box.exec_()
+
+    def process_frame(self, frame):
+        # Predict objects in the frame
+        predictions = self.model.predict(frame, show=True, conf=0.5)
+
+        print(predictions[0].boxes.conf)
+        arr = predictions[0].boxes.conf.numpy()
+        if arr.size > 0:
+            cv2.imshow('frame', frame)
+            cv2.waitKey(0)
+
+    def capture_video(self):
+
+        while True:
+            # Read a frame from the video
+            ret, frame = self.cap.read()
+
+            if not ret:
+                break  # Break the loop if no frame is captured
+
+            # Process the frame to detect objects
+            self.process_frame(frame)
+
+        self.cap.release()  # Release the video capture object
 
     def open_new_window(self):
         self.new_window = NewWindow()

@@ -18,35 +18,20 @@ def process_frame(frame, confidence_threshold=0.5):
         cv2.imshow('frame', frame)
         cv2.waitKey(0)
 
-    # if probs is not None:
-    #     print("hi")
-    #     # Check for "palm oil" label with confidence above the threshold
-    #     if probs > confidence_threshold:
-    #             # Perform your desired action when detections are found
-    #         cv2.imshow('detected', frame)
-    #         cv2.waitKey(0)
+def capture_video():
+    cap = cv2.VideoCapture(video_path)
+
+    while True:
+        # Read a frame from the video
+        ret, frame = cap.read()
+
+        if not ret:
+            break  # Break the loop if no frame is captured
 
 
+        # Process the frame to detect objects
+        process_frame(frame)
 
-def perform_action(prediction):
-    # Perform your desired action when detections are found
-    # For example, you can log the detection details, save frames, etc.
-    print(f"Detection found: Label - {prediction.label}, Confidence - {prediction.confidence}")
+    cap.release()  # Release the video capture object
 
-
-# Initialize video capture
-
-cap = cv2.VideoCapture(video_path)
-
-while True:
-    # Read a frame from the video
-    ret, frame = cap.read()
-
-    if not ret:
-        break  # Break the loop if no frame is captured
-
-
-    # Process the frame to detect objects
-    process_frame(frame)
-
-cap.release()  # Release the video capture object
+capture_video()
