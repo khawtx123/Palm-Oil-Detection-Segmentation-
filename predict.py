@@ -22,7 +22,7 @@ H, W, _ = frame.shape
 out = cv2.VideoWriter(video_path_out, cv2.VideoWriter_fourcc(*'mp4v'), int(cap.get(cv2.CAP_PROP_FPS)), (W, H))
 
 
-model_path = os.path.join('.', 'model', 'best_prev.pt')
+model_path = os.path.join('.', 'model', 'best.pt')
 model = YOLO(model_path)
 threshold = 0
 
