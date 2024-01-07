@@ -151,6 +151,7 @@ class Segmentation(QWidget):
             options = QFileDialog.Options()
             file_path, _ = QFileDialog.getOpenFileName(self, 'Open File', '', 'All Files (*);;Text Files (*.txt)',
                                                        options=options)
+            QMessageBox.information(self, 'File Selected', f'Selected file path: {file_path}')
             self.performSegmentation(file_path)
             # Load the selected image using QPixmap
             input = cv2.imread(file_path)
@@ -167,16 +168,13 @@ class Segmentation(QWidget):
             if not file_path:  # Check if no file is selected
                 raise Exception("No files selected")  # Raise an exception if no file is selected
 
-            QMessageBox.information(self, 'File Selected', f'Selected file path: {file_path}')
+
 
         except Exception as e:
             if str(e) == "No files selected":  # Handle the specific exception
                 QMessageBox.warning(self, 'Warning', 'No files selected.')
             else:
                 QMessageBox.critical(self, 'Error', f'An error occurred: No files selected !')
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select Image", "",
-                                                   "Image Files (*.png *.jpg *.jpeg *.bmp *.gif);;All Files (*)",
-                                                   options=options)
 
     def segment_rodent(self):
         self.btn_segment_palm_oil.setStyleSheet(DEFAULT_WIDGET_STYLE_SHEET)
@@ -441,12 +439,89 @@ class Detection(QWidget):
 class Rate(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.stacked_widget = QStackedWidget()
         self.layout = QVBoxLayout()
-        self.btn_layout = QHBoxLayout()
-        self.btn_segment = QPushButton("Segment")
-        self.layout.addWidget(self.btn_segment)
+        self.layout.setAlignment(Qt.AlignCenter)  # Center-align the layout
+
+        # Create a label widget to display video feed
+        self.label = QLabel(self)
+        self.layout.addWidget(self.label, alignment=Qt.AlignCenter)  # Center-align the label
+
+        # Create a label for "Video Stopped" text (initially hidden)
+        self.stopped_label = QLabel("Video Stopped", self)
+        self.stopped_label.setStyleSheet("font-size: 24px; color: red;")
+        self.stopped_label.setAlignment(Qt.AlignCenter)  # Center-align the text label
+        self.stopped_label.hide()  # Hide the label initially
+        self.layout.addWidget(self.stopped_label)
+        self.layout.addSpacing(70)
+
+        # Create a button to start/stop video capture
+        self.btn_start_stop = QPushButton('Start Video', self)
+        self.btn_start_stop.setStyleSheet(DEFAULT_WIDGET_STYLE_SHEET)
+        self.btn_start_stop.clicked.connect(self.toggle_video_capture)
+        self.layout.addWidget(self.btn_start_stop, alignment=Qt.AlignCenter)  # Center-align the button
+
+        # Set the layout to the main window
         self.setLayout(self.layout)
+
+        # Initialize video capture as stopped
+        self.is_capturing = False
+
+        # Create a timer to fetch frames
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_frame)
+
+    def update_frame(self):
+        self.btn_start_stop.setStyleSheet(ON_CLICK_STYLE_SHEET)
+        # Capture frame-by-frame
+        ret, frame = self.capture.read()
+
+        if ret:
+            # Save the frame to display later if capture stops
+            self.last_frame = frame.copy()
+
+            # Convert the frame to RGB
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+            # Convert to QImage
+            h, w, ch = rgb_frame.shape
+            bytes_per_line = ch * w
+            qt_image = QImage(rgb_frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
+
+            # Update the QLabel with QPixmap
+            pixmap = QPixmap.fromImage(qt_image)
+            self.label.setPixmap(pixmap)
+
+    def toggle_video_capture(self):
+        if not self.is_capturing:
+            # Start video capture
+            self.capture = cv2.VideoCapture(0)
+            self.timer.start(30)  # Update every 30 milliseconds
+            self.btn_start_stop.setText('Stop Video')
+            self.stopped_label.hide()  # Hide the stopped label
+        else:
+            # Stop video capture
+            self.timer.stop()
+            self.capture.release()
+
+            # Clear video feed
+            self.label.clear()
+
+            # Display the last captured frame
+            rgb_frame = cv2.cvtColor(self.last_frame, cv2.COLOR_BGR2RGB)
+            h, w, ch = rgb_frame.shape
+            bytes_per_line = ch * w
+            qt_image = QImage(rgb_frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
+            pixmap = QPixmap.fromImage(qt_image)
+            self.label.setPixmap(pixmap)
+
+            # Show the label indicating video is stopped
+            self.stopped_label.show()
+
+            self.btn_start_stop.setText('Start Video')
+
+        # Toggle capturing flag
+        self.is_capturing = not self.is_capturing
+
 
 class MainWindow(QWidget):
     def __init__(self):
