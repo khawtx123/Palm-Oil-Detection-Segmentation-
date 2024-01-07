@@ -38,7 +38,6 @@ DEFAULT_WIDGET_STYLE_SHEET = """
                                                                 """
 
 class Segmentation(QWidget):
-
     def __init__(self, parent=None):
         self.stacked_widget = QStackedWidget()
         global DETECTED_FRAME_PATH, MASK_PATH, MASKED_IMG_PATH
@@ -245,8 +244,6 @@ class Detection(QWidget):
     def __init__(self, parent=None):
         super(Detection, self).__init__(parent)
         self.stacked_widget = QStackedWidget()
-
-        self.detection_widget = QWidget()
         self.layout = QVBoxLayout()
         self.btn_layout = QHBoxLayout()
         self.btn_segment = QPushButton("Segment")
@@ -383,9 +380,6 @@ class Detection(QWidget):
         image_path = self.show_file_dialog()
         predictions = model.predict(image_path, confidence=80, overlap=80).json()
         image = cv2.imread(image_path)
-        cv2.imshow('img', image)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
 
         for prediction in predictions["predictions"]:
             x = int(prediction['x'])
@@ -399,13 +393,14 @@ class Detection(QWidget):
                         (0, 255, 0), 1)
 
         if predictions["predictions"] is not None:
-            cv2.imshow('img', image)
-            cv2.waitKey(0)
             cv2.destroyAllWindows()
             cv2.imwrite(DETECTED_RODENT_FRAME_PATH, image)
 
             masked_image = cv2.bitwise_and(cv2.imread(DETECTED_FRAME_PATH), cv2.imread(MASK_PATH))
             cv2.imwrite(MASKED_IMG_PATH, masked_image)
+
+            self.original_img_pixmap = QPixmap()
+            self.original_pic.setPixmap(self.original_img_pixmap)
 
             self.masked_img_pixmap = QPixmap(DETECTED_RODENT_FRAME_PATH)  # Replace with your image file path
             scaled_pixmap = self.masked_img_pixmap.scaled(800, 600, aspectRatioMode=Qt.KeepAspectRatio)
@@ -435,12 +430,23 @@ class Detection(QWidget):
                 raise Exception("No files selected")  # Raise an exception if no file is selected
 
             QMessageBox.information(self, 'File Selected', f'Selected file path: {file_path}')
+            return file_path
 
         except Exception as e:
             if str(e) == "No files selected":  # Handle the specific exception
                 QMessageBox.warning(self, 'Warning', 'No files selected.')
             else:
                 QMessageBox.critical(self, 'Error', f'An error occurred: No files selected !')
+
+class Rate(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.stacked_widget = QStackedWidget()
+        self.layout = QVBoxLayout()
+        self.btn_layout = QHBoxLayout()
+        self.btn_segment = QPushButton("Segment")
+        self.layout.addWidget(self.btn_segment)
+        self.setLayout(self.layout)
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -450,9 +456,11 @@ class MainWindow(QWidget):
 
         self.segmentation = Segmentation(self)
         self.detection = Detection(self.stacked_widget)
+        self.rate = Rate(self)
 
         self.stacked_widget.addWidget(self.segmentation)
         self.stacked_widget.addWidget(self.detection)
+        self.stacked_widget.addWidget(self.rate)
 
         self.btn_to_segmentation = QPushButton("Segmentation")
         self.btn_to_segmentation.clicked.connect(self.switch_to_segmentation_window)
@@ -499,7 +507,7 @@ class MainWindow(QWidget):
         self.btn_to_segmentation.setStyleSheet(DEFAULT_STYLE_SHEET)
         self.btn_to_rate.setStyleSheet(ON_CLICK_STYLE_SHEET)
         self.btn_to_detection.setStyleSheet(DEFAULT_STYLE_SHEET)
-        self.stacked_widget.setCurrentWidget(self.detection)
+        self.stacked_widget.setCurrentWidget(self.rate)
 
     def keyPressEvent(self, event):
         """Override keyPressEvent to toggle fullscreen on 'F' key press"""
