@@ -1,16 +1,18 @@
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QImage, QPixmap
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QStackedWidget, QHBoxLayout, QFileDialog, QMessageBox
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QStackedWidget, QHBoxLayout, QFileDialog, QMessageBox, QDesktopWidget
 from UNET import Unet
 from ultralytics import YOLO
 import cv2
 from roboflow import Roboflow
 import sys
+from PyQt5.QtGui import QIcon
 
 DETECTED_FRAME_PATH = "detection/detected_frame.jpg"
 MASK_PATH = "detection/mask.jpg"
 MASKED_IMG_PATH = "detection/masked_img.jpg"
 DETECTED_RODENT_FRAME_PATH = "detection/detected_rodent_frame.jpg"
+ICON_PATH = "icon/HarvestMate.png"
 DEFAULT_STYLE_SHEET = """
                                                                     background-color: #000000;  /* Green background color */
                                                                     color: white;               /* White text color */
@@ -320,11 +322,10 @@ class Detection(QWidget):
     def process_frame(self, frame):
         # Predict objects in the frame
         predictions = self.model.predict(frame, show=True, conf=0.5)
-
         print(predictions[0].boxes.conf)
         arr = predictions[0].boxes.conf.numpy()
         if arr.size > 0:
-            cv2.imshow('frame', frame)
+            cv2.imshow('Original', frame)
             cv2.imwrite(DETECTED_FRAME_PATH, frame)
             cv2.waitKey(0)
 
@@ -526,7 +527,12 @@ class Rate(QWidget):
 class MainWindow(QWidget):
     def __init__(self):
         super(MainWindow, self).__init__()
+        self.setGeometry(0, 0, 400, 300)  # Set initial geometry
+        # Center window on the screen
+        self.center_window()
 
+        self.setWindowIcon(QIcon(ICON_PATH))
+        self.setStyleSheet("background-color: rgba(131, 159, 58, 150);")
         self.stacked_widget = QStackedWidget()
 
         self.segmentation = Segmentation(self)
@@ -595,10 +601,24 @@ class MainWindow(QWidget):
         # Call base class keyPressEvent for other key events
         super().keyPressEvent(event)
 
+    def center_window(self):
+        # Get the screen geometry
+        screen = QDesktopWidget().screenGeometry()
+
+        # Calculate the center position for the window
+        window_position_x = (screen.width() - self.width()) // 2
+        window_position_y = (screen.height() - self.height()) // 2
+
+        # Set the window position
+        self.move(window_position_x, window_position_y)
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     window = MainWindow()
-    window.setWindowTitle('Main Window with Two Buttons')
+    window.setWindowTitle('HarvestMate')
+    window.setFixedSize(1080,720)
+    window.setGeometry(0, 0, 800, 500)  # Set initial geometry
+
     window.show()
     sys.exit(app.exec_())
