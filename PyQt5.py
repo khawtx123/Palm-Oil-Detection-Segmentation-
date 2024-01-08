@@ -1,3 +1,4 @@
+import functools
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QImage, QPixmap, QIcon
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QStackedWidget, QHBoxLayout, QFileDialog, QMessageBox, QDesktopWidget
@@ -12,15 +13,19 @@ import imutils
 import cv2
 from keras.models import load_model
 import numpy as np
+import math
 
-DETECTION_MODEL_PATH = 'haarcascade_files/haarcascade_frontalface_default.xml'
+DETECTION_MODEL_PATH = r"haarcascasde_files/haarcascade_frontalface_default.xml"
 EMOTION_MODEL_PATH = 'model/_mini_XCEPTION.102-0.66.hdf5'
 DETECTED_FRAME_PATH = "detection/detected_frame.jpg"
 MASK_PATH = "detection/mask.jpg"
 MASKED_IMG_PATH = "detection/masked_img.jpg"
 DETECTED_RODENT_FRAME_PATH = "detection/detected_rodent_frame.jpg"
+SEGMENT_RODENT_HOLE_PATH = "detection/segmented_rodent_hole.jpg"
+SEGMENT_RODENT_BITE_MARKS_PATH = "detection/segmented_rodent_bite_marks.jpg"
 FEEDBACK_IMG_PATH = "ratings/feedback.jpg"
-PREDS_IMG_PATH = "ratings/predictions.jpg"
+FEEDBACK_PREDS_IMG_PATH = "ratings/feedback_preds.jpg"
+PREDS_DATA_PATH = "ratings/predictions.jpg"
 ICON_PATH = "icon/HarvestMate.png"
 VIDEO_SAD_PATH = "videos/sad.mp4"
 DEFAULT_STYLE_SHEET = """
@@ -190,35 +195,63 @@ class Segmentation(QWidget):
     def segment_rodent(self):
         self.btn_segment_palm_oil.setStyleSheet(DEFAULT_WIDGET_STYLE_SHEET)
         self.btn_rodent.setStyleSheet(ON_CLICK_STYLE_SHEET)
-        global DETECTED_FRAME_PATH
-        try:
-            options = QFileDialog.Options()
-            file_path, _ = QFileDialog.getOpenFileName(self, 'Open File', '', 'All Files (*);;Text Files (*.txt)',
-                                                       options=options)
-            self.performSegmentation(file_path)
-            # Load the selected image using QPixmap
-            input = cv2.imread(file_path)
-            cv2.imwrite(DETECTED_FRAME_PATH, input)
-            pixmap = QPixmap(file_path)  # Replace with your image file path
-            self.detected_pic.setPixmap(pixmap)
-            masked_image = cv2.bitwise_and(cv2.imread(DETECTED_FRAME_PATH), cv2.imread(MASK_PATH))
-            cv2.imwrite(MASKED_IMG_PATH, masked_image)
-            pixmap = QPixmap(MASKED_IMG_PATH)  # Replace with your image file path
-            self.segmented_pic.setPixmap(pixmap)
 
-            pixmap = QPixmap(MASK_PATH)  # Replace with your image file path
-            self.mask.setPixmap(pixmap)
-            if not file_path:  # Check if no file is selected
-                raise Exception("No files selected")  # Raise an exception if no file is selected
+        rf = Roboflow(api_key="SOTkBQnU3ZURHAp0gJtr")
+        project = rf.workspace().project("rodent-palm-oil")
+        model = project.version(1).model
 
-            QMessageBox.information(self, 'File Selected', f'Selected file path: {file_path}')
+        image_path = self.show_file_dialog()
+        predictions = model.predict(image_path, confidence=60).json()
+        image = cv2.imread(image_path)
+        image2 = cv2.imread(image_path)
 
-        except Exception as e:
-            if str(e) == "No files selected":  # Handle the specific exception
-                QMessageBox.warning(self, 'Warning', 'No files selected.')
+        for prediction in predictions["predictions"]:
+            if prediction['class'] == "holes":
+                contours = []
+                w = int(prediction['width'])
+                h = int(prediction['height'])
+                x = int(prediction['x'] - w / 2)
+                y = int(prediction['y'] - h / 2)
+                mask = np.zeros((h, w))
+                class_name = prediction['class']
+                confidence = prediction['confidence']
+
+                # for point in prediction['point']:
+                #     contours.append((point['x'], point['y']))
+                #     contours = np.array(contours, dtype=np.int32)
+                #     cv2.drawContours(mask, [contours], -1, 255, -1)
+                # cv2.imshow('mask',mask)
+                # cv2.waitKey(0)
+                #
+                cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 1)  # Draw bounding box
+                cv2.putText(image, f"{class_name} {confidence:.1f}", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.3,
+                            (0, 255, 0), 1)
+                cv2.imwrite(SEGMENT_RODENT_HOLE_PATH, image)
             else:
-                QMessageBox.critical(self, 'Error', f'An error occurred: No files selected !')
+                w = int(prediction['width'])
+                h = int(prediction['height'])
+                x = int(prediction['x'] - w / 2)
+                y = int(prediction['y'] - h / 2)
+                class_name = prediction['class']
+                confidence = prediction['confidence']
+                cv2.rectangle(image2, (x, y), (x + w, y + h), (0, 255, 0), 1)  # Draw bounding box
+                cv2.putText(image2, f"{class_name} {confidence:.1f}", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.3,
+                            (0, 255, 0), 1)
+                cv2.imwrite(SEGMENT_RODENT_BITE_MARKS_PATH, image2)
 
+        if predictions["predictions"] is not None:
+            cv2.destroyAllWindows()
+
+            self.original_img_pixmap = QPixmap(image_path)
+            self.detected_pic.setPixmap(self.original_img_pixmap)
+
+            self.masked_img_pixmap = QPixmap(SEGMENT_RODENT_HOLE_PATH)  # Replace with your image file path
+            scaled_pixmap = self.masked_img_pixmap.scaled(800, 600, aspectRatioMode=Qt.KeepAspectRatio)
+            self.segmented_pic.setPixmap(scaled_pixmap)
+
+            self.mask_pixmap = QPixmap(SEGMENT_RODENT_BITE_MARKS_PATH)  # Replace with your image file path
+            scaled_mask_pixmap = self.mask_pixmap.scaled(800, 600, aspectRatioMode=Qt.KeepAspectRatio)
+            self.mask.setPixmap(scaled_mask_pixmap)
 
     def show_segmentation(self):
         file_path = DETECTED_FRAME_PATH
@@ -240,6 +273,25 @@ class Segmentation(QWidget):
         pixmap = QPixmap(MASK_PATH)  # Replace with your image file path
         scaled_pixmap = pixmap.scaled(800, 600, aspectRatioMode=Qt.KeepAspectRatio)
         self.mask.setPixmap(scaled_pixmap)
+
+    def show_file_dialog(self):
+        global DETECTED_FRAME_PATH
+        try:
+            options = QFileDialog.Options()
+            file_path, _ = QFileDialog.getOpenFileName(self, 'Open File', '', 'All Files (*);;Text Files (*.txt)',
+                                                       options=options)
+
+            if not file_path:  # Check if no file is selected
+                raise Exception("No files selected")  # Raise an exception if no file is selected
+
+            QMessageBox.information(self, 'File Selected', f'Selected file path: {file_path}')
+            return file_path
+
+        except Exception as e:
+            if str(e) == "No files selected":  # Handle the specific exception
+                QMessageBox.warning(self, 'Warning', 'No files selected.')
+            else:
+                QMessageBox.critical(self, 'Error', f'An error occurred: No files selected !')
 
 class Detection(QWidget):
     video_path = r"videos/Harvesting Palm Oil Using a Machine.mp4"
@@ -378,30 +430,27 @@ class Detection(QWidget):
         self.btn_rodent.setStyleSheet(ON_CLICK_STYLE_SHEET)
 
         rf = Roboflow(api_key="SOTkBQnU3ZURHAp0gJtr")
-        project = rf.workspace().project("rodent_palm_oil")
+        project = rf.workspace().project("rodent-palm-oil")
         model = project.version(1).model
 
         image_path = self.show_file_dialog()
-        predictions = model.predict(image_path, confidence=70, overlap=80).json()
+        predictions = model.predict(image_path, confidence = 60).json()
         image = cv2.imread(image_path)
 
         for prediction in predictions["predictions"]:
-            x = int(prediction['x'])
-            y = int(prediction['y'])
             w = int(prediction['width'])
             h = int(prediction['height'])
+            x = int(prediction['x'] - w/2)
+            y = int(prediction['y'] - h/2)
             class_name = prediction['class']
             confidence = prediction['confidence']
-            cv2.rectangle(image, (x, y), (x + w+20, y + h+20), (0, 255, 0), 1)  # Draw bounding box
+            cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 1)  # Draw bounding box
             cv2.putText(image, f"{class_name} {confidence:.1f}", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.3,
                         (0, 255, 0), 1)
 
         if predictions["predictions"] is not None:
             cv2.destroyAllWindows()
             cv2.imwrite(DETECTED_RODENT_FRAME_PATH, image)
-
-            masked_image = cv2.bitwise_and(cv2.imread(DETECTED_FRAME_PATH), cv2.imread(MASK_PATH))
-            cv2.imwrite(MASKED_IMG_PATH, masked_image)
 
             self.original_img_pixmap = QPixmap()
             self.original_pic.setPixmap(self.original_img_pixmap)
@@ -448,9 +497,31 @@ class Rate(QWidget):
         self.layout = QVBoxLayout()
         self.layout.setAlignment(Qt.AlignCenter)  # Center-align the layout
 
-        # Create a label widget to display video feed
-        self.label = QLabel(self)
-        self.layout.addWidget(self.label, alignment=Qt.AlignCenter)  # Center-align the label
+        self.img_layout = QHBoxLayout()
+        self.img_layout.setAlignment(Qt.AlignCenter)
+
+        self.preds_layout = QVBoxLayout()
+        self.img_layout.setAlignment(Qt.AlignCenter)
+
+        self.ori_img_label = QLabel(self)
+        self.feedback_pred_label = QLabel(self)
+        self.feedback_pred_data_label = QLabel(self)
+        self.feedback_rating_label = QLabel('Your Rating: ', self)
+        self.feedback_rating_label.setStyleSheet("font-size: 24px; color: black;")
+
+        self.preds_layout.addWidget(self.feedback_pred_label, alignment=Qt.AlignCenter)
+        self.preds_layout.addWidget(self.feedback_pred_data_label, alignment=Qt.AlignCenter)
+        self.preds_layout.addWidget(self.feedback_rating_label, alignment=Qt.AlignCenter)
+        self.preds_widget = QWidget()
+        self.preds_widget.setLayout(self.preds_layout)
+
+        self.img_layout.addWidget(self.ori_img_label, alignment=Qt.AlignCenter)
+        self.img_layout.addWidget(self.preds_widget)
+
+        self.img_widget = QWidget()
+        self.img_widget.setLayout(self.img_layout)
+
+        self.layout.addWidget(self.img_widget, alignment=Qt.AlignCenter)  # Center-align the label
 
         # Create a label for "Video Stopped" text (initially hidden)
         self.stopped_label = QLabel("Video Stopped", self)
@@ -495,14 +566,14 @@ class Rate(QWidget):
 
             # Update the QLabel with QPixmap
             pixmap = QPixmap.fromImage(qt_image)
-            self.label.setPixmap(pixmap)
+            self.ori_img_label.setPixmap(pixmap)
 
     def toggle_video_capture(self):
         if not self.is_capturing:
             # Start video capture
             self.capture = cv2.VideoCapture(0)
             self.timer.start(30)  # Update every 30 milliseconds
-            self.btn_start_stop.setText('Stop Video')
+            self.btn_start_stop.setText('Rate us !')
             self.stopped_label.hide()  # Hide the stopped label
         else:
             # Stop video capture
@@ -510,33 +581,35 @@ class Rate(QWidget):
             self.capture.release()
 
             # Clear video feed
-            self.label.clear()
+            self.ori_img_label.clear()
 
             # Display the last captured frame
             rgb_frame = cv2.cvtColor(self.last_frame, cv2.COLOR_BGR2RGB)
+            cv2.imwrite(FEEDBACK_IMG_PATH, self.last_frame)
             h, w, ch = rgb_frame.shape
             bytes_per_line = ch * w
             qt_image = QImage(rgb_frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
             pixmap = QPixmap.fromImage(qt_image)
-            self.label.setPixmap(pixmap)
+            self.ori_img_label.setPixmap(pixmap)
 
             # Show the label indicating video is stopped
             self.stopped_label.show()
 
             self.btn_start_stop.setText('Start Video')
+            self.emotion_detection()
 
         # Toggle capturing flag
         self.is_capturing = not self.is_capturing
+
 
 
     def emotion_detection(self):
         face_detection = cv2.CascadeClassifier(DETECTION_MODEL_PATH)
         emotion_classifier = load_model(EMOTION_MODEL_PATH, compile=False)
         EMOTIONS = ["angry", "disgust", "scared", "happy", "sad", "surprised", "neutral"]
-
+        rating_weights = [1, 1, 2, 10, 4, 8, 7]
         # Read the image
-        image_path = 'test img/happy.jpg'
-        frame = cv2.imread(image_path)
+        frame = cv2.imread(FEEDBACK_IMG_PATH)
         frame = imutils.resize(frame, width=300)
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -565,16 +638,29 @@ class Rate(QWidget):
                 w = int(prob * 300)
                 cv2.rectangle(canvas, (7, (i * 35) + 5), (w, (i * 35) + 35), (0, 0, 255), -1)
                 cv2.putText(canvas, text, (10, (i * 35) + 23), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 2)
+                rating_weights[i]*= preds[i]
 
             cv2.putText(frameClone, label, (fX, fY - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)
             cv2.rectangle(frameClone, (fX, fY), (fX + fW, fY + fH), (0, 0, 255), 2)
 
+        rating = functools.reduce(lambda x, y: x + y, rating_weights)
+
         cv2.imshow('Emotion Recognition', frameClone)
         cv2.imshow("Probabilities", canvas)
-        cv2.imwrite(FEEDBACK_IMG_PATH, frameClone)
-        cv2.imwrite()
+        cv2.imwrite(FEEDBACK_PREDS_IMG_PATH, frameClone)
+        cv2.imwrite(PREDS_DATA_PATH, canvas)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
+        qt_image = QImage(FEEDBACK_PREDS_IMG_PATH)
+        pixmap = QPixmap.fromImage(qt_image)
+        self.feedback_pred_label.setPixmap(pixmap)
+
+        qt_image = QImage(PREDS_DATA_PATH)
+        pixmap = QPixmap.fromImage(qt_image)
+        self.feedback_pred_data_label.setPixmap(pixmap)
+
+        self.feedback_rating_label.setText(f"Your rating : {str(math.ceil(rating))} / 10")
+        self.feedback_rating_label.setStyleSheet("font-size: 24px; color: black;")
 
 class MainWindow(QWidget):
     def __init__(self):
