@@ -20,9 +20,15 @@ EMOTION_MODEL_PATH = 'model/_mini_XCEPTION.102-0.66.hdf5'
 DETECTED_FRAME_PATH = "detection/detected_frame.jpg"
 MASK_PATH = "detection/mask.jpg"
 MASKED_IMG_PATH = "detection/masked_img.jpg"
-DETECTED_RODENT_FRAME_PATH = "detection/detected_rodent_frame.jpg"
+
+DETECTED_RODENT_HOLE_PATH = "detection/detected_rodent_hole.jpg"
+DETECTED_RODENT_BITE_MARKS_PATH = "detection/detected_rodent_bite_marks.jpg"
+
+SEGMENT_RODENT_HOLE_MASK_PATH = "detection/segmented_rodent_hole_mask.jpg"
+SEGMENT_RODENT_BITE_MARKS_MASK_PATH = "detection/segmented_rodent_bite_mask_marks.jpg"
 SEGMENT_RODENT_HOLE_PATH = "detection/segmented_rodent_hole.jpg"
 SEGMENT_RODENT_BITE_MARKS_PATH = "detection/segmented_rodent_bite_marks.jpg"
+
 FEEDBACK_IMG_PATH = "ratings/feedback.jpg"
 FEEDBACK_PREDS_IMG_PATH = "ratings/feedback_preds.jpg"
 PREDS_DATA_PATH = "ratings/predictions.jpg"
@@ -202,42 +208,62 @@ class Segmentation(QWidget):
 
         image_path = self.show_file_dialog()
         predictions = model.predict(image_path, confidence=60).json()
-        image = cv2.imread(image_path)
-        image2 = cv2.imread(image_path)
-
+        hole_image = cv2.imread(image_path)
+        bite_marks_image = cv2.imread(image_path)
+        height, width = hole_image.shape[:2]
+        hole_mask = np.zeros((height, width))
+        bite_marks_mask = np.zeros((height, width))
         for prediction in predictions["predictions"]:
             if prediction['class'] == "holes":
-                contours = []
-                w = int(prediction['width'])
-                h = int(prediction['height'])
-                x = int(prediction['x'] - w / 2)
-                y = int(prediction['y'] - h / 2)
-                mask = np.zeros((h, w))
-                class_name = prediction['class']
-                confidence = prediction['confidence']
+                coordinates = []
+                for point in prediction['points']:
+                    coordinates.append([int(point['x']), int(point['y'])])
+                coordinates = np.array(coordinates)
+                contours = [coordinates.reshape((-1, 1, 2)).astype(np.int32)]
 
-                # for point in prediction['point']:
-                #     contours.append((point['x'], point['y']))
-                #     contours = np.array(contours, dtype=np.int32)
-                #     cv2.drawContours(mask, [contours], -1, 255, -1)
-                # cv2.imshow('mask',mask)
-                # cv2.waitKey(0)
-                #
-                cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 1)  # Draw bounding box
-                cv2.putText(image, f"{class_name} {confidence:.1f}", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.3,
-                            (0, 255, 0), 1)
-                cv2.imwrite(SEGMENT_RODENT_HOLE_PATH, image)
+                # Draw contours on the empty image
+                cv2.drawContours(hole_mask, contours, -1, 255, -1)
+                # w = int(prediction['width'])
+                # h = int(prediction['height'])
+                # x = int(prediction['x'] - w / 2)
+                # y = int(prediction['y'] - h / 2)
+                # class_name = prediction['class']
+                # confidence = prediction['confidence']
+                # cv2.rectangle(hole_image, (x, y), (x + w, y + h), (0, 255, 0), 1)  # Draw bounding box
+                # cv2.putText(hole_image, f"{class_name} {confidence:.1f}", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.3,
+                #             (0, 255, 0), 1)
+
             else:
-                w = int(prediction['width'])
-                h = int(prediction['height'])
-                x = int(prediction['x'] - w / 2)
-                y = int(prediction['y'] - h / 2)
-                class_name = prediction['class']
-                confidence = prediction['confidence']
-                cv2.rectangle(image2, (x, y), (x + w, y + h), (0, 255, 0), 1)  # Draw bounding box
-                cv2.putText(image2, f"{class_name} {confidence:.1f}", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.3,
-                            (0, 255, 0), 1)
-                cv2.imwrite(SEGMENT_RODENT_BITE_MARKS_PATH, image2)
+                coordinates = []
+                for point in prediction['points']:
+                    coordinates.append([int(point['x']), int(point['y'])])
+                coordinates = np.array(coordinates)
+                contours = [coordinates.reshape((-1, 1, 2)).astype(np.int32)]
+
+                cv2.drawContours(bite_marks_mask, contours, -1, 255, -1)
+                # w = int(prediction['width'])
+                # h = int(prediction['height'])
+                # x = int(prediction['x'] - w / 2)
+                # y = int(prediction['y'] - h / 2)
+                # class_name = prediction['class']
+                # confidence = prediction['confidence']
+                # cv2.rectangle(hole_image, (x, y), (x + w, y + h), (0, 255, 0), 1)  # Draw bounding box
+                # cv2.putText(hole_image, f"{class_name} {confidence:.1f}", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.3,
+                #             (0, 255, 0), 1)
+
+        try:
+            cv2.imwrite(SEGMENT_RODENT_HOLE_MASK_PATH, hole_mask)
+            masked_hole_image = cv2.bitwise_and(hole_image, cv2.imread(SEGMENT_RODENT_HOLE_MASK_PATH))
+            cv2.imwrite(SEGMENT_RODENT_HOLE_PATH, masked_hole_image)
+        except:
+            QMessageBox.critical(self, 'Error', f'An error occurred: No holes detected !')
+
+        try:
+            cv2.imwrite(SEGMENT_RODENT_BITE_MARKS_MASK_PATH, bite_marks_mask)
+            masked_bite_marks_image = cv2.bitwise_and(bite_marks_image, cv2.imread(SEGMENT_RODENT_BITE_MARKS_MASK_PATH))
+            cv2.imwrite(SEGMENT_RODENT_BITE_MARKS_PATH, masked_bite_marks_image)
+        except:
+            QMessageBox.critical(self, 'Error', f'An error occurred: No bite marks detected !')
 
         if predictions["predictions"] is not None:
             cv2.destroyAllWindows()
@@ -435,31 +461,45 @@ class Detection(QWidget):
 
         image_path = self.show_file_dialog()
         predictions = model.predict(image_path, confidence = 60).json()
-        image = cv2.imread(image_path)
+        hole_image = cv2.imread(image_path)
+        bite_marks_image = cv2.imread(image_path)
 
         for prediction in predictions["predictions"]:
-            w = int(prediction['width'])
-            h = int(prediction['height'])
-            x = int(prediction['x'] - w/2)
-            y = int(prediction['y'] - h/2)
-            class_name = prediction['class']
-            confidence = prediction['confidence']
-            cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 1)  # Draw bounding box
-            cv2.putText(image, f"{class_name} {confidence:.1f}", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.3,
-                        (0, 255, 0), 1)
+            if prediction['class'] == "holes":
+                w = int(prediction['width'])
+                h = int(prediction['height'])
+                x = int(prediction['x'] - w/2)
+                y = int(prediction['y'] - h/2)
+                class_name = prediction['class']
+                confidence = prediction['confidence']
+                cv2.rectangle(hole_image, (x, y), (x + w, y + h), (0, 255, 0), 1)  # Draw bounding box
+                cv2.putText(hole_image, f"{class_name} {confidence:.1f}", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.3,
+                            (0, 255, 0), 1)
+            else:
+                w = int(prediction['width'])
+                h = int(prediction['height'])
+                x = int(prediction['x'] - w / 2)
+                y = int(prediction['y'] - h / 2)
+                class_name = prediction['class']
+                confidence = prediction['confidence']
+                cv2.rectangle(bite_marks_image, (x, y), (x + w, y + h), (0, 255, 0), 1)  # Draw bounding box
+                cv2.putText(bite_marks_image, f"{class_name} {confidence:.1f}", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.3,
+                            (0, 255, 0), 1)
+
+        cv2.imwrite(DETECTED_RODENT_HOLE_PATH, hole_image)
+        cv2.imwrite(DETECTED_RODENT_BITE_MARKS_PATH, bite_marks_image)
 
         if predictions["predictions"] is not None:
             cv2.destroyAllWindows()
-            cv2.imwrite(DETECTED_RODENT_FRAME_PATH, image)
 
-            self.original_img_pixmap = QPixmap()
+            self.original_img_pixmap = QPixmap(image_path)
             self.original_pic.setPixmap(self.original_img_pixmap)
 
-            self.masked_img_pixmap = QPixmap(DETECTED_RODENT_FRAME_PATH)  # Replace with your image file path
+            self.masked_img_pixmap = QPixmap(DETECTED_RODENT_HOLE_PATH)  # Replace with your image file path
             scaled_pixmap = self.masked_img_pixmap.scaled(800, 600, aspectRatioMode=Qt.KeepAspectRatio)
             self.segmented_pic.setPixmap(scaled_pixmap)
 
-            self.mask_pixmap = QPixmap(image_path)  # Replace with your image file path
+            self.mask_pixmap = QPixmap(DETECTED_RODENT_BITE_MARKS_PATH)  # Replace with your image file path
             scaled_mask_pixmap = self.mask_pixmap.scaled(800, 600, aspectRatioMode=Qt.KeepAspectRatio)
             self.mask.setPixmap(scaled_mask_pixmap)
 
