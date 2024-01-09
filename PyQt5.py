@@ -1,7 +1,7 @@
 import functools
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal, Qt
 from PyQt5.QtGui import QImage, QPixmap, QIcon
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QStackedWidget, QHBoxLayout, QFileDialog, QMessageBox, QDesktopWidget
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QStackedWidget, QHBoxLayout, QFileDialog, QMessageBox, QDesktopWidget, QMainWindow,QLineEdit, QDialog
 from UNET import Unet
 from ultralytics import YOLO
 from roboflow import Roboflow
@@ -684,12 +684,6 @@ class Rate(QWidget):
             cv2.rectangle(frameClone, (fX, fY), (fX + fW, fY + fH), (0, 0, 255), 2)
 
         rating = functools.reduce(lambda x, y: x + y, rating_weights)
-
-        cv2.imshow('Emotion Recognition', frameClone)
-        cv2.imshow("Probabilities", canvas)
-        cv2.imwrite(FEEDBACK_PREDS_IMG_PATH, frameClone)
-        cv2.imwrite(PREDS_DATA_PATH, canvas)
-        cv2.waitKey(0)
         cv2.destroyAllWindows()
         qt_image = QImage(FEEDBACK_PREDS_IMG_PATH)
         pixmap = QPixmap.fromImage(qt_image)
@@ -705,11 +699,7 @@ class Rate(QWidget):
 class MainWindow(QWidget):
     def __init__(self):
         super(MainWindow, self).__init__()
-        self.setGeometry(0, 0, 400, 300)  # Set initial geometry
-        # Center window on the screen
-        self.center_window()
 
-        self.setWindowIcon(QIcon(ICON_PATH))
         self.setStyleSheet("background-color: rgba(255, 255, 255);")
         self.stacked_widget = QStackedWidget()
 
@@ -768,6 +758,306 @@ class MainWindow(QWidget):
         self.btn_to_detection.setStyleSheet(DEFAULT_STYLE_SHEET)
         self.stacked_widget.setCurrentWidget(self.rate)
 
+class RegisterPage(QWidget):
+    def __init__(self, credentials):
+        super().__init__()
+
+        self.credentials = credentials
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle('Register Page')
+        self.setGeometry(300, 300, 300, 150)
+
+        # Widgets
+        self.lbl_new_username = QLabel('New Username:')
+        self.lbl_new_password = QLabel('New Password:')
+        self.txt_new_username = QLineEdit()
+        self.txt_new_password = QLineEdit()
+        self.btn_register = QPushButton('Register')
+
+        # Password field settings
+        self.txt_new_password.setEchoMode(QLineEdit.Password)
+
+        # Layout
+        vbox = QVBoxLayout()
+        hbox_username = QHBoxLayout()
+        hbox_password = QHBoxLayout()
+
+        hbox_username.addWidget(self.lbl_new_username)
+        hbox_username.addWidget(self.txt_new_username)
+
+        hbox_password.addWidget(self.lbl_new_password)
+        hbox_password.addWidget(self.txt_new_password)
+
+        vbox.addLayout(hbox_username)
+        vbox.addLayout(hbox_password)
+        vbox.addWidget(self.btn_register)
+
+        self.setLayout(vbox)
+
+        # Event Handling
+        self.btn_register.clicked.connect(self.register)
+
+        self.show()
+
+    def register(self):
+        new_username = self.txt_new_username.text()
+        new_password = self.txt_new_password.text()
+
+        # Check if the username already exists
+        if new_username in self.credentials:
+            QMessageBox.warning(self, 'Registration Error', 'Username already exists. Please choose a different one.')
+            return
+
+        # Store the new credentials in the dictionary
+        self.credentials[new_username] = new_password
+
+        # Save credentials to a file (for demonstration purposes, you might want to use a more secure storage method)
+        with open('credentials.txt', 'a') as file:
+            file.write(f'{new_username}:{new_password}\n')
+
+        print('Registration successful!')
+        self.close()
+
+
+class ResetPasswordPage(QDialog):
+    def __init__(self, credentials, username):
+        super().__init__()
+
+        self.credentials = credentials
+        self.username = username
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle('Reset Password')
+        self.setGeometry(300, 300, 300, 150)
+
+        # Widgets
+        self.lbl_new_password = QLabel('New Password:')
+        self.txt_new_password = QLineEdit()
+        self.btn_reset_password = QPushButton('Reset Password')
+
+        # Password field settings
+        self.txt_new_password.setEchoMode(QLineEdit.Password)
+
+        # Layout
+        vbox = QVBoxLayout()
+        hbox_password = QHBoxLayout()
+
+        hbox_password.addWidget(self.lbl_new_password)
+        hbox_password.addWidget(self.txt_new_password)
+
+        vbox.addLayout(hbox_password)
+        vbox.addWidget(self.btn_reset_password)
+
+        self.setLayout(vbox)
+
+        # Event Handling
+        self.btn_reset_password.clicked.connect(self.reset_password)
+
+        self.show()
+
+    def reset_password(self):
+        new_password = self.txt_new_password.text()
+
+        # Update the password in the credentials dictionary
+        self.credentials[self.username] = new_password
+
+        # Save updated credentials to the file
+        with open('credentials.txt', 'w') as file:
+            for u, p in self.credentials.items():
+                file.write(f'{u}:{p}\n')
+
+        print('Password reset successful!')
+        self.accept()
+
+
+class ForgotPasswordPage(QWidget):
+    def __init__(self, credentials):
+        super().__init__()
+
+        self.credentials = credentials
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle('Forgot Password')
+        self.setGeometry(300, 300, 300, 150)
+
+        # Widgets
+        self.lbl_username = QLabel('Username:')
+        self.txt_username = QLineEdit()
+        self.btn_reset_password = QPushButton('Reset Password')
+
+        # Layout
+        vbox = QVBoxLayout()
+        hbox_username = QHBoxLayout()
+
+        hbox_username.addWidget(self.lbl_username)
+        hbox_username.addWidget(self.txt_username)
+
+        vbox.addLayout(hbox_username)
+        vbox.addWidget(self.btn_reset_password)
+
+        self.setLayout(vbox)
+
+        # Event Handling
+        self.btn_reset_password.clicked.connect(self.reset_password)
+
+        self.show()
+
+    def reset_password(self):
+        username = self.txt_username.text()
+
+        # Check if the username exists
+        if username in self.credentials:
+            reset_password_dialog = ResetPasswordPage(self.credentials, username)
+            if reset_password_dialog.exec_() == QDialog.Accepted:
+                print('Password reset successful!')
+            else:
+                print('Password reset canceled.')
+        else:
+            QMessageBox.warning(self, 'Password Reset Error', 'Username not found. Please enter a valid username.')
+
+
+class PrintRunner(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle('Print Runner')
+        self.setGeometry(400, 400, 300, 100)
+
+        label = QLabel('Hello, World!')
+        layout = QVBoxLayout()
+        layout.addWidget(label)
+
+        self.setLayout(layout)
+
+        self.show()
+
+
+class LoginPage(QWidget):
+    successful_login = pyqtSignal()
+
+    def __init__(self):
+        super().__init__()
+
+        # Load existing credentials from the file or create an empty dictionary if the file doesn't exist
+        self.credentials = {}
+        try:
+            with open('credentials.txt', 'r') as file:
+                for line in file:
+                    username, password = line.strip().split(':')
+                    self.credentials[username] = password
+        except FileNotFoundError:
+            pass
+
+        self.init_ui()
+
+    def init_ui(self):
+        # Widgets
+        self.lbl_username = QLabel('Username:')
+        self.lbl_password = QLabel('Password:')
+        self.txt_username = QLineEdit()
+        self.txt_password = QLineEdit()
+        self.btn_login = QPushButton('Login')
+        self.btn_register = QPushButton('Register')
+        self.btn_forgot_password = QPushButton('Forgot Password')
+
+        # Password field settings
+        self.txt_password.setEchoMode(QLineEdit.Password)
+
+        # Layout
+        vbox = QVBoxLayout()
+        hbox_username = QHBoxLayout()
+        hbox_password = QHBoxLayout()
+        hbox_buttons = QHBoxLayout()
+
+        hbox_username.addWidget(self.lbl_username)
+        hbox_username.addWidget(self.txt_username)
+
+        hbox_password.addWidget(self.lbl_password)
+        hbox_password.addWidget(self.txt_password)
+
+        hbox_buttons.addWidget(self.btn_login)
+        hbox_buttons.addWidget(self.btn_register)
+        hbox_buttons.addWidget(self.btn_forgot_password)
+
+        vbox.addLayout(hbox_username)
+        vbox.addLayout(hbox_password)
+        vbox.addLayout(hbox_buttons)
+
+        self.setLayout(vbox)
+
+        # Event Handling
+        self.btn_login.clicked.connect(self.login)
+        self.btn_register.clicked.connect(self.show_register_page)
+        self.btn_forgot_password.clicked.connect(self.show_forgot_password_page)
+
+        self.show()
+
+    def login(self):
+        username = self.txt_username.text()
+        password = self.txt_password.text()
+
+        # Check credentials
+        if username in self.credentials and self.credentials[username] == password:
+            print('Login successful!')
+            self.successful_login.emit()  # Emit signal on successful login
+        else:
+            QMessageBox.warning(self, 'Login Error', 'Invalid credentials. Please try again.')
+
+    def show_register_page(self):
+        self.register_page = RegisterPage(self.credentials)
+        self.register_page.show()
+
+    def show_forgot_password_page(self):
+        self.forgot_password_page = ForgotPasswordPage(self.credentials)
+        self.forgot_password_page.show()
+
+    def on_successful_login(self):
+        window = MainWindow()
+        window.setWindowTitle('HarvestMate')
+        window.setFixedSize(1080, 720)
+        window.setGeometry(0, 0, 800, 500)  # Set initial geometry
+
+        window.show()
+
+
+class MainApplication(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setGeometry(0, 0, 400, 300)  # Set initial geometry
+        self.setWindowIcon(QIcon(ICON_PATH))
+        # Center window on the screen
+        self.center_window()
+        # Create a stacked widget to hold login and main windows
+        self.stacked_widget = QStackedWidget(self)
+
+        # Add login page to stacked widget
+        self.login_page = LoginPage()
+        self.stacked_widget.addWidget(self.login_page)
+
+        # Connect successful_login signal to switch to main window
+        self.login_page.successful_login.connect(self.on_successful_login)
+
+        # Set central widget as stacked widget
+        self.setCentralWidget(self.stacked_widget)
+
+    def on_successful_login(self):
+        # Remove login page from stacked widget
+        self.stacked_widget.removeWidget(self.login_page)
+
+        # Create and add main window to stacked widget
+        self.main_window = MainWindow()
+        self.stacked_widget.addWidget(self.main_window)
+
+        # Switch to main window
+        self.stacked_widget.setCurrentWidget(self.main_window)
+
     def keyPressEvent(self, event):
         """Override keyPressEvent to toggle fullscreen on 'F' key press"""
         if event.key() == 70:  # 'F' key
@@ -790,13 +1080,11 @@ class MainWindow(QWidget):
         # Set the window position
         self.move(window_position_x, window_position_y)
 
-
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    window = MainWindow()
-    window.setWindowTitle('HarvestMate')
-    window.setFixedSize(1080,720)
-    window.setGeometry(0, 0, 800, 500)  # Set initial geometry
 
-    window.show()
+    main_app = MainApplication()
+    main_app.setWindowTitle('HarvestMate')
+    main_app.show()
+
     sys.exit(app.exec_())

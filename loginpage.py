@@ -2,6 +2,7 @@ import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout, QMessageBox, QDialog
 from PyQt5.QtCore import pyqtSignal, Qt
 import subprocess
+from UNET import Unet
 
 class RegisterPage(QWidget):
     def __init__(self, credentials):
@@ -269,7 +270,7 @@ class LoginPage(QWidget):
     def on_successful_login(self):
         # Run print.py using subprocess
         try:
-            subprocess.run(['python', 'print.py'], check=True)
+            subprocess.run(['python', 'PyQt5.py'], check=True)
         except subprocess.CalledProcessError as e:
             print(f'Error running print.py: {e}')
 
